@@ -1,0 +1,10 @@
+flask
+flask-cors
+torch
+transformers>=4.42.0
+safetensors
+sentence-transformers
+langchain
+langchain-community
+langchain-huggingface
+faiss-cpu
