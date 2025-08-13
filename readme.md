@@ -35,8 +35,8 @@ README.md                        # Project documentation
 
 ### 1️⃣ Clone the Repository
 ```bash
-git clone <your-repo-url>
-cd <repo-folder>
+git clone https://github.com/MukulGarg0097/Biomed-Rag-chatbot.git
+cd Biomed-Rag-chatbot
 ```
 
 ### 2️⃣ Install Dependencies
