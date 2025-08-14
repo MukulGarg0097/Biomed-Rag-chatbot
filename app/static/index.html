@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>🧬 BioMed RAG Chatbot</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  body { font-family: Arial, sans-serif; margin: 20px; background: #f5f6fa; }
+  h1 { color: #2f3640; }
+  .container { max-width: 900px; margin: auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,.08); }
+  textarea, input[type=text] { width: 100%; padding: 12px; margin-top: 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 15px; }
+  button { padding: 10px 16px; margin-top: 10px; background: #10b981; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; }
+  button:hover { background: #0ea371; }
+  .muted { color: #667085; font-size: 14px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .answer, .sources { margin-top: 18px; padding: 16px; background: #f8fafc; border-radius: 10px; border: 1px solid #eef2f7; }
+  .sources ul { padding-left: 20px; margin: 8px 0 0; }
+  .loading { color: #64748b; }
+  .pill { display:inline-flex; align-items:center; gap:6px; padding:4px 8px; border-radius:999px; font-size:12px; background:#ecfeff; color:#0e7490; border:1px solid #bae6fd; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+    <h1>🧬 BioMed RAG Chatbot</h1>
+    <span id="statusDot" class="pill">checking…</span>
+  </div>
+  <p class="muted">Ask a biomedical question and get AI-powered, evidence-based answers (Gemma + FAISS).</p>
+
+  <div class="row">
+    <div style="flex:1;min-width:260px">
+      <label class="muted">Your Question</label>
+      <textarea id="question" rows="3" placeholder="e.g., What are biomarkers for lung cancer?"></textarea>
+    </div>
+    <div style="width:180px">
+      <label class="muted">Top-K</label>
+      <input id="topk" type="text" value="3" />
+      <button onclick="checkHealth()" style="width:100%;background:#334155;margin-top:8px;">Check Health</button>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:8px;">
+    <button onclick="askQuestion()">Ask</button>
+  </div>
+
+  <div id="status" class="loading" style="margin-top:8px;"></div>
+
+  <div class="answer" id="answerBox" style="display:none;">
+    <h3>Answer</h3>
+    <p id="answerText" style="white-space:pre-wrap;"></p>
+  </div>
+
+  <div class="sources" id="sourcesBox" style="display:none;">
+    <h3>Sources</h3>
+    <ul id="sourcesList"></ul>
+  </div>
+</div>
+
+<script>
+function setDot(ok, text){
+  const dot = document.getElementById('statusDot');
+  dot.textContent = text || (ok ? 'healthy' : 'unhealthy');
+  dot.style.background = ok ? '#ecfdf5' : '#fef2f2';
+  dot.style.color = ok ? '#065f46' : '#991b1b';
+  dot.style.border = '1px solid ' + (ok ? '#a7f3d0' : '#fecaca');
+}
+
+async function checkHealth() {
+  const status = document.getElementById('status');
+  status.textContent = '🔍 Checking health...';
+  try {
+    const res = await fetch('/health', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    setDot(true, 'ok · index ' + (data.index_size ?? '?'));
+    status.textContent = '✅ Model: ' + (data.model_dir || 'unknown');
+  } catch (err) {
+    setDot(false, 'error');
+    status.textContent = '❌ ' + err.message;
+  }
+}
+
+async function askQuestion() {
+  const q = document.getElementById('question').value.trim();
+  const k = parseInt(document.getElementById('topk').value || '3', 10);
+  if (!q) { alert('Please enter a question.'); return; }
+
+  const status = document.getElementById('status');
+  const answerBox = document.getElementById('answerBox');
+  const sourcesBox = document.getElementById('sourcesBox');
+  const answerText = document.getElementById('answerText');
+  const sourcesList = document.getElementById('sourcesList');
+
+  status.textContent = '⏳ Getting answer...';
+  answerBox.style.display = 'none';
+  sourcesBox.style.display = 'none';
+  answerText.textContent = '';
+  sourcesList.innerHTML = '';
+
+  try {
+    const res = await fetch('/ask', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: q, k })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+
+    status.textContent = '';
+    answerText.textContent = data.answer || data.result || '(no answer)';
+    answerBox.style.display = 'block';
+
+    const srcs = data.sources || data.docs || [];
+    if (Array.isArray(srcs) && srcs.length) {
+      srcs.forEach(s => {
+        const li = document.createElement('li');
+        if (typeof s === 'string') {
+          li.textContent = s;
+        } else if (s && s.metadata && s.metadata.doc_id) {
+          li.textContent = s.metadata.doc_id;
+        } else {
+          li.textContent = JSON.stringify(s);
+        }
+        sourcesList.appendChild(li);
+      });
+      sourcesBox.style.display = 'block';
+    }
+  } catch (err) {
+    status.textContent = '❌ ' + err.message;
+  }
+}
+
+checkHealth();
+</script>
+</body>
+</html>
